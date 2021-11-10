@@ -1,2 +1,7 @@
 # CUJU-Backend
-Can-U-Join-Us 가 사용하는 server
+
+
+- port 4000
+- db   3333 : 3306
+
+`go run main.go`
