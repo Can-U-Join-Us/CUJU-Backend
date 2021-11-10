@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+
+  mariadb:
+    image: mariadb:10.4.6
+    container_name: CUJUserver
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: toor
+      TZ: Asia/Seoul
+    volumes:
+     - ./db_volumes:/var/lib/mysql
+    ports:
+     - '3333:3306'
+    command:
+      - --character-set-server=utf8mb4 
+      - --collation-server=utf8mb4_general_ci
