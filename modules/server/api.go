@@ -14,9 +14,9 @@ func pingTest(c *gin.Context) string {
 func dbConnectionTest(c *gin.Context) error {
 	db := storage.DB()
 	if db != nil {
-		return errors.New("CONNECTED")
+		return nil
 	}
-	return errors.New("ERROR")
+	return errors.New("Not connected")
 }
 func registerUser(c *gin.Context) error {
 	var reqBody struct {
@@ -72,9 +72,6 @@ func loginUser(c *gin.Context) error {
 	return nil
 }
 func modifyUser(c *gin.Context) error {
-	return nil
-}
-func chargeCredit(c *gin.Context) error {
 	return nil
 }
 func getPostList(c *gin.Context) ([]post, error) {
