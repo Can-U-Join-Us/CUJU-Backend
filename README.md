@@ -9,11 +9,11 @@
 --------
 DB Schema table
 
-- User
-  - Join
+- User ( pk : UID )
+  - Join ( pk : UID - fk )
 
-- Post
-  - Image
-  - Member
+- Post ( pk : PID )
+  - Image ( pk : PID - fk )
+  - Member ( pk : PID - fk )
 
 
