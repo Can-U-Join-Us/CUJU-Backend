@@ -12,9 +12,7 @@ var db *sql.DB
 func init() {
 	DB, err := sql.Open("mysql", "root:toor@tcp(localhost:3333)/cuju")
 	if err != nil {
-		fmt.Print("ERERERERE")
 		panic(err)
-		// logging.Warnf("gg")
 	}
 	db = DB
 	fmt.Print(DB)
@@ -23,8 +21,5 @@ func init() {
 	fmt.Println("Connected to:", version)
 }
 func DB() *sql.DB {
-	var version string
-	db.QueryRow("SELECT VERSION()").Scan(&version)
-	fmt.Println("Connected to:", version)
 	return db
 }
