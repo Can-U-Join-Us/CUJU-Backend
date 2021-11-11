@@ -33,11 +33,11 @@ func registerApiHandlers(api *gin.RouterGroup) {
 	400 -> ID or PW incorrect
 	*/
 	api.POST("/User/login", func(c *gin.Context) {
-		err := loginUser(c)
+		uid, err := loginUser(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(200, gin.H{"error": nil})
+			c.JSON(200, gin.H{"error": nil, "uid": uid})
 		}
 	})
 	/*  Reply			200 -> register success
