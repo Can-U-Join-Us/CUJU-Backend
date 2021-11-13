@@ -1,0 +1,8 @@
+   
+{
+    "debug": true,
+    "token": {
+      "ACCESS_SECRET": "myAccessSecret",
+      "REFRESH_SECRET": "myRefreshSecret"
+    }
+  }
