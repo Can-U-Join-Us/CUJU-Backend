@@ -1,9 +1,9 @@
 # CUJU-Backend
 
 
-- port 4000
-- db   3333 : 3306
-
+- router       4000
+- Docker db    3333 : 3306
+- Docker redis 6379 : 6379
 `go run main.go`
 
 --------
