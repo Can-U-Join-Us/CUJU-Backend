@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 
 	storage "github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,13 @@ func registerUser(c *gin.Context) error {
 		return err
 	}
 	db := storage.DB()
+	fmt.Println(reqBody.ID)
+	var id string
+	row := db.QueryRow(`Select id from user where id = "` + reqBody.ID + `"`)
+	err := row.Scan(&id)
+	if err == nil { // 중복된 ID가 있으면 에러 리턴
+		return errors.New("ID Duplicate")
+	}
 	stmt, err := db.Prepare("Insert into user(ID,PW,Name,Email) values(?,?,?,?)")
 	if err != nil {
 		return err
