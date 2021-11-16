@@ -40,27 +40,53 @@ func registerUser(c *gin.Context) error {
 	defer stmt.Close()
 	return nil
 }
-func loginUser(c *gin.Context) (uint, error) {
+
+func loginUser(c *gin.Context) (map[string]string, error) {
 	var reqBody struct {
 		ID string `json:"id"`
 		PW string `json:"pw"`
 	}
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
-		return 0, err
+		return map[string]string{}, err
 	}
 	db := storage.DB()
 	query := `select uid, PW from user where ID = "` + reqBody.ID + `"`
 	var pw string
 	row := db.QueryRow(query)
-	var uid uint
+	var uid uint64
 	err := row.Scan(&uid, &pw)
 	if err != nil { // ID 가 없으면 ID 가 없다는 오류 반환
-		return 0, errors.New("잘못된 ID")
+		return map[string]string{}, errors.New("ID")
 	}
 	if reqBody.PW != pw { // PW 가 다르면 PW 가 다르다는 오류 반환
-		return 0, errors.New("PW 불일치")
+		return map[string]string{}, errors.New("PW")
 	}
-	return uid, nil
+	ts, err := createToken(uid)
+	if err != nil {
+		return map[string]string{}, err
+	}
+	saveErr := createAuth(uid, ts) // Redis 토큰 메타데이터 저장
+	if saveErr != nil {
+		return map[string]string{}, err
+	}
+	tokens := map[string]string{
+		"access_token":  ts.AccessToken,
+		"refresh_token": ts.RefreshToken,
+	}
+	return tokens, nil
+}
+func logoutUser(c *gin.Context) error {
+	// request header 에 담긴 access & refresh token을 검증 후 redis 에서 삭제
+	au, ru, err := ExtractTokenMetadata(c.Request)
+	if err != nil {
+		return err
+	}
+	deleted, delErr := DeleteAuth(au.AccessUuid, ru.RefreshUuid)
+	if delErr != nil || deleted == 0 {
+		return err
+	}
+	return nil
+
 }
 func modifyUser(c *gin.Context) error {
 	return nil
@@ -187,30 +213,3 @@ type member struct {
 	Designer_desc string
 	More_desc     string
 }
-
-/*
-create table post (
-	PID int primary key auto_increment,
-	UID int not null,
-	Title varchar(50) not null,
-	Description varchar(255) not null,
-	Link varchar(255),
-	foreign key(UID) references user(UID)
-);
-create table image (
-	PID int primary key,
-	ImageLoc varchar(255),
-	foreign key(PID) references post(PID)
-);
-create table member (
-	PID int primary key,
-	FE int default 0, FE_desc varchar(100), FE_join int check(FE_join <= FE),
-	BE int default 0, BE_desc varchar(100), BE_join int check(BE_join <= BE),
-	AOS int default 0, AOS_desc varchar(100), AOS_join int check(AOS_join <= AOS),
-	IOS int default 0, IOS_desc varchar(100), IOS_join int check(IOS_join <= IOS),
-	PM int default 0, PM_desc varchar(100), PM_join int check(PM_join <= PM),
-	Designer int default 0, Designer_desc varchar(100), Designer_join int check(Designer_join <= Designer),
-	More int default 0, More_desc varchar(100), More_join int check(More_join <= More),
-	foreign key(PID) references post(PID)
-	);
-*/

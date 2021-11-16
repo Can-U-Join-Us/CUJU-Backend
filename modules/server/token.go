@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	"github.com/twinj/uuid"
 )
@@ -28,6 +27,10 @@ type TokenDetails struct {
 type AccessDetails struct {
 	AccessUuid string
 	UserId     uint64
+}
+type RefreshDetails struct {
+	RefreshUuid string
+	UserId      uint64
 }
 
 var client *redis.Client
@@ -47,50 +50,68 @@ func redisInit() {
 	}
 }
 
-func ExtractToken(r *http.Request) string {
+func ExtractToken(r *http.Request) []string {
 	bearToken := r.Header.Get("Authorization")
 	strArr := strings.Split(bearToken, " ")
-	if len(strArr) == 2 {
-		return strArr[1]
+	if len(strArr) == 3 {
+		return strArr[1:3]
 	}
-	return ""
+	return nil
 }
-func VerifyToken(r *http.Request) (token *jwt.Token, err error) {
+func VerifyToken(r *http.Request) (accessToken *jwt.Token, refreshToken *jwt.Token, err error) {
 	tokenString := ExtractToken(r)
-	fmt.Println(tokenString)
-	token, err = jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	accessToken, err = jwt.Parse(tokenString[0], func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(ACCESS_SECRET), nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return token, nil
-}
-func ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
-	token, err := VerifyToken(r)
-	if err != nil {
-		return nil, err
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if ok && token.Valid {
-		accessUuid, ok := claims["access_uuid"].(string)
-		if !ok {
-			return nil, err
+	refreshToken, err = jwt.Parse(tokenString[1], func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		userId, err := strconv.ParseUint(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
+		return []byte(REFRESH_SECRET), nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return accessToken, refreshToken, nil
+}
+func ExtractTokenMetadata(r *http.Request) (*AccessDetails, *RefreshDetails, error) {
+	accessToken, refreshToken, err := VerifyToken(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	accClaims, ok := accessToken.Claims.(jwt.MapClaims)
+	refClaims, ok_ := refreshToken.Claims.(jwt.MapClaims)
+
+	if ok && ok_ && accessToken.Valid && refreshToken.Valid {
+		accessUuid, ok := accClaims["access_uuid"].(string)
+		if !ok {
+			return nil, nil, err
+		}
+		userId, err := strconv.ParseUint(fmt.Sprintf("%.f", accClaims["user_id"]), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		refreshUuid, ok := refClaims["refresh_uuid"].(string)
+		if !ok {
+			return nil, nil, err
 		}
 		return &AccessDetails{
-			AccessUuid: accessUuid,
-			UserId:     userId,
-		}, nil
+				AccessUuid: accessUuid,
+				UserId:     userId,
+			}, &RefreshDetails{
+				RefreshUuid: refreshUuid,
+				UserId:      userId,
+			}, nil
 	}
-	return nil, err
+	return nil, nil, err
 }
+
 func FetchAuth(authD *AccessDetails) (uint64, error) {
 	userid, err := client.Get(authD.AccessUuid).Result()
 	if err != nil {
@@ -104,19 +125,6 @@ func FetchAuth(authD *AccessDetails) (uint64, error) {
 	return userID, nil
 }
 
-func TokenAuth(c *gin.Context) error {
-	tokenAuth, err := ExtractTokenMetadata(c.Request)
-	if err != nil {
-		return err
-	}
-	uid, err := FetchAuth(tokenAuth)
-	if err != nil {
-		return err
-	}
-	fmt.Println(uid)
-	// Authorized token return nil
-	return nil
-}
 func createToken(userid uint64) (*TokenDetails, error) {
 	td := &TokenDetails{}
 	td.AtExpires = time.Now().Add(time.Minute * 15).Unix()
@@ -127,7 +135,6 @@ func createToken(userid uint64) (*TokenDetails, error) {
 
 	var err error
 	//Creating Access Token
-	os.Setenv("ACCESS_SECRET", "jdnfksdmfksd") //this should be in an env file
 	atClaims := jwt.MapClaims{}
 	atClaims["authorized"] = true
 	atClaims["access_uuid"] = td.AccessUuid
@@ -139,7 +146,6 @@ func createToken(userid uint64) (*TokenDetails, error) {
 		return nil, err
 	}
 	//Creating Refresh Token
-	os.Setenv("REFRESH_SECRET", "mcmvmkmsdnfsdmfdsjf") //this should be in an env file
 	rtClaims := jwt.MapClaims{}
 	rtClaims["refresh_uuid"] = td.RefreshUuid
 	rtClaims["user_id"] = userid
@@ -166,8 +172,8 @@ func createAuth(userid uint64, td *TokenDetails) error {
 	}
 	return nil
 }
-func DeleteAuth(givenUuid string) (int64, error) {
-	deleted, err := client.Del(givenUuid).Result()
+func DeleteAuth(accessUuid string, refreshUuid string) (int64, error) {
+	deleted, err := client.Del(accessUuid, refreshUuid).Result()
 	if err != nil {
 		return 0, err
 	}
