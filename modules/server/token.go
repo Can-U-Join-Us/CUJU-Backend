@@ -53,8 +53,10 @@ func redisInit() {
 func ExtractToken(r *http.Request) []string {
 	bearToken := r.Header.Get("Authorization")
 	strArr := strings.Split(bearToken, " ")
-	if len(strArr) == 3 {
+	if len(strArr) == 3 { // refresh token require
 		return strArr[1:3]
+	} else if len(strArr) == 2 { // else auth api
+		return strArr[1:2]
 	}
 	return nil
 }
@@ -69,26 +71,52 @@ func VerifyToken(r *http.Request) (accessToken *jwt.Token, refreshToken *jwt.Tok
 	if err != nil {
 		return nil, nil, err
 	}
-	refreshToken, err = jwt.Parse(tokenString[1], func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+	if len(tokenString) == 2 { // refresh token require
+		refreshToken, err = jwt.Parse(tokenString[1], func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(REFRESH_SECRET), nil
+		})
+		if err != nil {
+			return nil, nil, err
 		}
-		return []byte(REFRESH_SECRET), nil
-	})
-	if err != nil {
-		return nil, nil, err
+		return accessToken, refreshToken, nil
 	}
-	return accessToken, refreshToken, nil
+	return accessToken, nil, nil
 }
-func ExtractTokenMetadata(r *http.Request) (*AccessDetails, *RefreshDetails, error) {
+func ExtractBothTokenMetadata(r *http.Request) (*AccessDetails, *RefreshDetails, error) {
 	accessToken, refreshToken, err := VerifyToken(r)
 	if err != nil {
 		return nil, nil, err
 	}
 	accClaims, ok := accessToken.Claims.(jwt.MapClaims)
-	refClaims, ok_ := refreshToken.Claims.(jwt.MapClaims)
 
-	if ok && ok_ && accessToken.Valid && refreshToken.Valid {
+	if refreshToken != nil {
+		refClaims, ok_ := refreshToken.Claims.(jwt.MapClaims)
+		if ok && ok_ && accessToken.Valid && refreshToken.Valid {
+			accessUuid, ok := accClaims["access_uuid"].(string)
+			if !ok {
+				return nil, nil, err
+			}
+			userId, err := strconv.ParseUint(fmt.Sprintf("%.f", accClaims["user_id"]), 10, 64)
+			if err != nil {
+				return nil, nil, err
+			}
+			refreshUuid, ok := refClaims["refresh_uuid"].(string)
+			if !ok {
+				return nil, nil, err
+			}
+			return &AccessDetails{
+					AccessUuid: accessUuid,
+					UserId:     userId,
+				}, &RefreshDetails{
+					RefreshUuid: refreshUuid,
+					UserId:      userId,
+				}, nil
+		}
+	}
+	if ok && accessToken.Valid {
 		accessUuid, ok := accClaims["access_uuid"].(string)
 		if !ok {
 			return nil, nil, err
@@ -97,17 +125,11 @@ func ExtractTokenMetadata(r *http.Request) (*AccessDetails, *RefreshDetails, err
 		if err != nil {
 			return nil, nil, err
 		}
-		refreshUuid, ok := refClaims["refresh_uuid"].(string)
-		if !ok {
-			return nil, nil, err
-		}
 		return &AccessDetails{
 				AccessUuid: accessUuid,
 				UserId:     userId,
-			}, &RefreshDetails{
-				RefreshUuid: refreshUuid,
-				UserId:      userId,
-			}, nil
+			}, nil,
+			nil
 	}
 	return nil, nil, err
 }
