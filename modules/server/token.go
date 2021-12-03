@@ -201,3 +201,20 @@ func DeleteAuth(accessUuid string, refreshUuid string) (int64, error) {
 	}
 	return deleted, nil
 }
+
+func CheckTokenAuth(r *http.Request) error {
+	// request 의 Access 토큰을 추출
+	// CheckAccessToken() 호출 : 추출한 AccessToken의 만료 여부를 검사
+	// 만료 -> Refresh Token 요청 후 CheckRefreshToken() 호출 : RefreshToken의 만료 여부를 검사
+	// Refresh 만료   -> createToken()으로 Access&Refresh 한 쌍 반환
+	// Refresh 만료 X -> createAccessToken()으로 AccessToken 반환
+	// 만료 X -> nil 반환
+
+	return nil
+}
+func CheckAccessToken(r *http.Request) error {
+	return nil
+}
+func CheckRefreshToken(r *http.Request) error {
+	return nil
+}
