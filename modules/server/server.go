@@ -16,7 +16,9 @@ var REFRESH_SECRET string
 func init() { // local : 4000 호스팅 시작
 	r := gin.Default()
 	redisInit()
+
 	api := r.Group("/api")
+	api.Use(dummy)
 	registerApiHandlers(api)
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")    // optionally look for config in the working directory
@@ -27,8 +29,10 @@ func init() { // local : 4000 호스팅 시작
 	ACCESS_SECRET = viper.GetString(`token.ACCESS_SECRET`)
 	REFRESH_SECRET = viper.GetString(`token.REFRESH_SECRET`)
 
-	fmt.Println("\n\n", ACCESS_SECRET, REFRESH_SECRET, "\n\n")
 	r.Run(port)
+}
+func dummy(c *gin.Context) {
+	fmt.Println("더미입니당")
 }
 func registerApiHandlers(api *gin.RouterGroup) {
 	api.GET("/ping", func(c *gin.Context) {
@@ -54,6 +58,17 @@ func registerApiHandlers(api *gin.RouterGroup) {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
 			c.JSON(200, gin.H{"error": nil, "token": token})
+		}
+	})
+	/*  Reply			200 -> null
+	400 -> Modify fail
+	*/
+	api.POST("/User/modify", func(c *gin.Context) {
+		err := modifyUser(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil})
 		}
 	})
 	/*  Reply			200 -> token delete
