@@ -85,7 +85,7 @@ func loginUser(c *gin.Context) (map[string]string, error) {
 }
 func logoutUser(c *gin.Context) error {
 	// request header 에 담긴 access & refresh token을 검증 후 redis 에서 삭제
-	au, ru, err := ExtractTokenMetadata(c.Request)
+	au, ru, err := ExtractBothTokenMetadata(c.Request)
 	if err != nil {
 		return err
 	}
@@ -97,6 +97,11 @@ func logoutUser(c *gin.Context) error {
 
 }
 func modifyUser(c *gin.Context) error {
+	au, _, err := ExtractBothTokenMetadata(c.Request)
+	if err != nil {
+		return err
+	}
+	fmt.Println("This user id is ", au.UserId)
 	return nil
 }
 func getPostList(c *gin.Context) ([]post, error) {
