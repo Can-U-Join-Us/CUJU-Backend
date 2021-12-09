@@ -1,19 +1,16 @@
-# CUJU-Backend
+# 같이할래? 🤝
 
+<div align="center">
+<img src="https://github.com/Can-U-Join-Us/CUJU-AOS/blob/master/images/initial_4.png" width="300">
+</br>
+</div>
 
-- router       4000
-- Docker db    3333 : 3306
-- Docker redis 6379 : 6379
-`go run main.go`
+## Port configuration
+ - Server  4000
+ - Docker DB  3333:3306
+ - Docker redis 6379:6379
 
---------
-DB Schema table
-
-- User ( pk : UID )
-  - Join ( pk : UID - fk )
-
-- Post ( pk : PID )
-  - Image ( pk : PID - fk )
-  - Member ( pk : PID - fk )
-
-
+## Run
+```
+go run main.go
+```
