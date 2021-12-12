@@ -35,7 +35,7 @@ type RefreshDetails struct {
 
 var client *redis.Client
 
-func redisInit() {
+func redisInit() error {
 	//Initializing redis
 	dsn := os.Getenv("REDIS_DSN")
 	if len(dsn) == 0 {
@@ -46,8 +46,9 @@ func redisInit() {
 	})
 	_, err := client.Ping().Result()
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
+	return nil
 }
 
 func ExtractToken(r *http.Request) []string {
