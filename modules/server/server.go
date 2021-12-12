@@ -15,8 +15,9 @@ var REFRESH_SECRET string
 
 func init() { // local : 4000 호스팅 시작
 	r := gin.Default()
-	redisInit()
-
+	if err := redisInit(); err != nil {
+		panic(fmt.Errorf("Fatal error : redis is off status \n"))
+	}
 	api := r.Group("/api")
 	api.Use(dummy)
 	registerApiHandlers(api)
@@ -32,23 +33,9 @@ func init() { // local : 4000 호스팅 시작
 	r.Run(port)
 }
 func dummy(c *gin.Context) {
-	fmt.Println("더미입니당")
+	fmt.Println("미들웨어 더미입니당")
 }
 func registerApiHandlers(api *gin.RouterGroup) {
-	api.GET("/ping", func(c *gin.Context) {
-		message := pingTest(c)
-		c.JSON(200, gin.H{
-			"message": message,
-		})
-	})
-	api.GET("/db", func(c *gin.Context) {
-		err := dbConnectionTest(c)
-		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
-		} else {
-			c.JSON(200, gin.H{"error": nil})
-		}
-	})
 	/*  Reply			200 -> token
 	400 -> ID or PW incorrect
 	*/
