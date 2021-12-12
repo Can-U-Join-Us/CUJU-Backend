@@ -4,20 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	ErrChecker "github.com/Can-U-Join-Us/CUJU-Backend/modules/errors"
+
 	storage "github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
 	"github.com/gin-gonic/gin"
 )
 
-func pingTest(c *gin.Context) string {
-	return "PONG"
-}
-func dbConnectionTest(c *gin.Context) error {
-	db := storage.DB()
-	if db != nil {
-		return nil
-	}
-	return errors.New("Not connected")
-}
 func registerUser(c *gin.Context) error {
 	var reqBody struct {
 		ID    string `json:"id"`
@@ -25,23 +17,23 @@ func registerUser(c *gin.Context) error {
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}
-	if err := c.ShouldBindJSON(&reqBody); err != nil {
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	db := storage.DB()
-	fmt.Println(reqBody.ID)
 	var id string
 	row := db.QueryRow(`Select id from user where id = "` + reqBody.ID + `"`)
-	err := row.Scan(&id)
-	if err == nil { // 중복된 ID가 있으면 에러 리턴
+	err = row.Scan(&id)
+	if err := ErrChecker.Check(err); err != nil {
 		return errors.New("ID Duplicate")
 	}
 	stmt, err := db.Prepare("Insert into user(ID,PW,Name,Email) values(?,?,?,?)")
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	rs, err := stmt.Exec(reqBody.ID, reqBody.PW, reqBody.Name, reqBody.Email)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	_ = rs
@@ -54,7 +46,8 @@ func loginUser(c *gin.Context) (map[string]string, error) {
 		ID string `json:"id"`
 		PW string `json:"pw"`
 	}
-	if err := c.ShouldBindJSON(&reqBody); err != nil {
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
 		return map[string]string{}, err
 	}
 	db := storage.DB()
@@ -62,19 +55,19 @@ func loginUser(c *gin.Context) (map[string]string, error) {
 	var pw string
 	row := db.QueryRow(query)
 	var uid uint64
-	err := row.Scan(&uid, &pw)
-	if err != nil { // ID 가 없으면 ID 가 없다는 오류 반환
+	err = row.Scan(&uid, &pw)
+	if err := ErrChecker.Check(err); err != nil {
 		return map[string]string{}, errors.New("ID")
 	}
 	if reqBody.PW != pw { // PW 가 다르면 PW 가 다르다는 오류 반환
 		return map[string]string{}, errors.New("PW")
 	}
 	ts, err := createToken(uid)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return map[string]string{}, err
 	}
-	saveErr := createAuth(uid, ts) // Redis 토큰 메타데이터 저장
-	if saveErr != nil {
+	err = createAuth(uid, ts) // Redis 토큰 메타데이터 저장
+	if err := ErrChecker.Check(err); err != nil {
 		return map[string]string{}, err
 	}
 	tokens := map[string]string{
@@ -86,11 +79,11 @@ func loginUser(c *gin.Context) (map[string]string, error) {
 func logoutUser(c *gin.Context) error {
 	// request header 에 담긴 access & refresh token을 검증 후 redis 에서 삭제
 	au, ru, err := ExtractBothTokenMetadata(c.Request)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
-	deleted, delErr := DeleteAuth(au.AccessUuid, ru.RefreshUuid)
-	if delErr != nil || deleted == 0 {
+	deleted, err := DeleteAuth(au.AccessUuid, ru.RefreshUuid)
+	if err := ErrChecker.Check(err); err != nil || deleted == 0 {
 		return err
 	}
 	return nil
@@ -98,7 +91,7 @@ func logoutUser(c *gin.Context) error {
 }
 func modifyUser(c *gin.Context) error {
 	au, _, err := ExtractBothTokenMetadata(c.Request)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	fmt.Println("This user id is ", au.UserId)
@@ -115,7 +108,7 @@ func getPostList(c *gin.Context) ([]post, error) {
 	}
 	query = `select post.PID,post.UId,Title,TotalMember,FE,BE,AOS,IOS,PM,Designer,More from post join member on post.pid = member.pid`
 	rows, err := db.Query(query)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return []post{}, err
 	}
 	defer rows.Close()
@@ -126,7 +119,7 @@ func getPostList(c *gin.Context) ([]post, error) {
 		err := rows.Scan(&pos.PostID, &pos.UID, &pos.Title,
 			&pos.TotalMember, &pos.FE, &pos.BE, &pos.AOS, &pos.IOS,
 			&pos.PM, &pos.Designer, &pos.More)
-		if err != nil {
+		if err := ErrChecker.Check(err); err != nil {
 			return []post{}, err
 		}
 		posts = append(posts, pos)
@@ -160,13 +153,14 @@ func addPost(c *gin.Context) error {
 		Designer_desc string `json:"designer_desc"`
 		More_desc     string `json:"more_desc"`
 	}
-	if err := c.ShouldBindJSON(&reqBody); err != nil {
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 
 	db := storage.DB()
-	_, err := db.Exec(`Insert into post(UID,Title,TotalMember) values(?,?,?)`, reqBody.UID, reqBody.Title, reqBody.TotMem)
-	if err != nil {
+	_, err = db.Exec(`Insert into post(UID,Title,TotalMember) values(?,?,?)`, reqBody.UID, reqBody.Title, reqBody.TotMem)
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	var pid uint
@@ -175,12 +169,12 @@ func addPost(c *gin.Context) error {
 		reqBody.FE, reqBody.FE_desc, reqBody.BE, reqBody.BE_desc, reqBody.AOS, reqBody.AOS_desc,
 		reqBody.IOS, reqBody.IOS_desc, reqBody.PM, reqBody.PM_desc, reqBody.Designer,
 		reqBody.Designer_desc, reqBody.More, reqBody.More_desc)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	db.Prepare(`Insert into member values(?)`)
 	_, err = db.Exec(`Insert into postDetail values(?,?)`, pid, reqBody.Desc)
-	if err != nil {
+	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
 	return nil
