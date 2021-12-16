@@ -302,11 +302,47 @@ func addProject(c *gin.Context) error {
 	return nil
 }
 func denyProject(c *gin.Context) error {
+	var reqBody struct {
+		PID int `json:"pid"`
+		UID int `json:"uid"`
+	}
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
+		return err
+	}
+	db := storage.DB()
+	var count int
+	_ = db.QueryRow(`select count(*) from join_queue where uid = ` + strconv.Itoa(reqBody.UID) + ` and pid = ` + strconv.Itoa(reqBody.PID) + ` and confirm = 0`).Scan(&count)
+	if count == 0 {
+		return errors.New("Nothing")
+	}
+	_, err = db.Exec(`update join_queue set result = 2, confirm = 1 where uid =  ` + strconv.Itoa(reqBody.UID))
 
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func permitProject(c *gin.Context) error {
+	var reqBody struct {
+		PID int `json:"pid"`
+		UID int `json:"uid"`
+	}
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
+		return err
+	}
+	db := storage.DB()
+	var count int
+	_ = db.QueryRow(`select count(*) from join_queue where uid = ` + strconv.Itoa(reqBody.UID) + ` and pid = ` + strconv.Itoa(reqBody.PID) + ` and confirm = 0`).Scan(&count)
+	if count == 0 {
+		return errors.New("Nothing")
+	}
+	_, err = db.Exec(`update join_queue set result = 1, confirm = 1 where uid =  ` + strconv.Itoa(reqBody.UID))
 
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func joinProject(c *gin.Context) error {
@@ -331,10 +367,10 @@ func refreshMsg(c *gin.Context) ([]msg, error) {
 	db := storage.DB()
 	var pid, id, result int
 	var name, email, title string
-	query := `select p.pid, j.uid,u.name, u.email, p.title, j.result from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid`
+	query := `select p.pid, j.uid,u.name, u.email, j.result from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid where j.result = 0 and j.confirm = 0`
 	rows, err := db.Query(query)
 	if err != nil {
-		return []msg{}, errors.New("Nothing")
+		return []msg{}, err
 	}
 	defer rows.Close()
 	msgList := make([]msg, 0)
@@ -342,34 +378,43 @@ func refreshMsg(c *gin.Context) ([]msg, error) {
 	for i := 0; i < len(res); i++ {
 		msgList = append(msgList, res[i])
 	}
+	var m msg
 	for rows.Next() {
-		if err := rows.Scan(&pid, &id, &name, &email, &title, &result); err != nil {
+		if err := rows.Scan(&pid, &id, &name, &email, &result); err != nil {
 			return []msg{}, err
 		}
 		uuid, _ := strconv.Atoi(uid)
-		var m msg
-		if result == 0 {
-			m = msg{
-				TYPE:    1,
-				SUBJECT: strconv.Itoa(id) + ` 번 프로젝트 참여 신청입니다 !`,
-				CONTENT: name + `(` + email + `) 님이 ` + title + `(` + strconv.Itoa(pid) + `) 프로젝트에 참여하고 싶어합니다.`,
-				PID:     pid,
-				UID:     uuid,
-			}
-		} else {
-			var ctt string
-			if result == 1 {
-				ctt = title + `(` + strconv.Itoa(pid) + `) 프로젝트 : 거절`
-			} else {
-				ctt = title + `(` + strconv.Itoa(pid) + `) 프로젝트 : 승인`
-			}
-			m = msg{
-				TYPE:    2,
-				SUBJECT: strconv.Itoa(id) + ` 번 프로젝트 주최자의 답변이 도착했습니다 !`,
-				CONTENT: ctt,
-				PID:     0,
-				UID:     0,
-			}
+		m = msg{
+			TYPE:    1,
+			TITLE:   strconv.Itoa(id) + ` 번 프로젝트 참여 신청입니다 !`,
+			CONTENT: email,
+			PID:     pid,
+			UID:     uuid,
+		}
+		msgList = append(msgList, m)
+	}
+	query = `select p.pid,p.title,j.result from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid where j.result != 0 and confirm = 0`
+	rows, err = db.Query(query)
+	if err != nil {
+		return []msg{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&id, &title, &result); err != nil {
+			return []msg{}, err
+		}
+		var ctt string
+		if result == 1 { // permission
+			ctt = title + `(` + strconv.Itoa(pid) + `) 프로젝트 : 승인`
+		} else { // deny
+			ctt = title + `(` + strconv.Itoa(pid) + `) 프로젝트 : 거절`
+		}
+		m = msg{
+			TYPE:    2,
+			TITLE:   strconv.Itoa(id) + ` 번 프로젝트 주최자의 답변이 도착했습니다 !`,
+			CONTENT: ctt,
+			PID:     0,
+			UID:     0,
 		}
 
 		msgList = append(msgList, m)
@@ -378,8 +423,8 @@ func refreshMsg(c *gin.Context) ([]msg, error) {
 	if len(msgList) == 0 {
 		return []msg{}, errors.New("Nothing")
 	}
-	query = `delete j from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid where j.result > 0`
-	_, err = db.Exec(query) // 참여 결과에 대한 메세지 큐는 삭제
+	query = `update join_queue j join project_post p on j.pid= p.pid and p.uid = 7 left join user u on u.uid = j.uid  set j.confirm = 1 where j.result > 0`
+	_, err = db.Exec(query) // 참여 결과 알림 메세지는 읽음 상태로 변경
 	if err != nil {
 		return []msg{}, err
 	}
@@ -388,7 +433,7 @@ func refreshMsg(c *gin.Context) ([]msg, error) {
 func getAnnouncement(c *gin.Context) ([]msg, error) {
 	annoList := make([]msg, 0)
 	db := storage.DB()
-	query := `select subject,content from announce where send = false`
+	query := `select title,content from announce where send = false`
 	rows, err := db.Query(query)
 	if err != nil {
 		return []msg{}, errors.New("Nothing")
@@ -396,13 +441,13 @@ func getAnnouncement(c *gin.Context) ([]msg, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var subject, content string
-		if err := rows.Scan(&subject, &content); err != nil {
+		var title, content string
+		if err := rows.Scan(&title, &content); err != nil {
 			return []msg{}, err
 		}
 		m := msg{
 			TYPE:    0,
-			SUBJECT: subject,
+			TITLE:   title,
 			CONTENT: content,
 			PID:     0,
 			UID:     0,
@@ -414,7 +459,7 @@ func getAnnouncement(c *gin.Context) ([]msg, error) {
 }
 func postAnnouncement(c *gin.Context) error {
 	var reqBody struct {
-		SUBJECT string `json:"subject"`
+		TITLE   string `json:"title"`
 		CONTENT string `json:"content"`
 	}
 	err := c.ShouldBindJSON(&reqBody)
@@ -422,7 +467,7 @@ func postAnnouncement(c *gin.Context) error {
 		return err
 	}
 	db := storage.DB()
-	_, err = db.Exec(`insert into announce values(?,?,?)`, reqBody.SUBJECT, reqBody.CONTENT, 0)
+	_, err = db.Exec(`insert into announce values(?,?,?)`, reqBody.TITLE, reqBody.CONTENT, 0)
 	if err != nil {
 		return err
 	}
@@ -431,7 +476,7 @@ func postAnnouncement(c *gin.Context) error {
 
 type msg struct {
 	TYPE    int    `json:"type"`
-	SUBJECT string `json:"subject"`
+	TITLE   string `json:"title"`
 	CONTENT string `json:"content"`
 	PID     int    `json:"pid"`
 	UID     int    `json:"uid"`
