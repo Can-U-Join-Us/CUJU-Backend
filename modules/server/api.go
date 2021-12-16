@@ -96,10 +96,11 @@ func logoutUser(c *gin.Context) error {
 }
 func findUserPW(c *gin.Context) error {
 	var reqBody struct {
-		ID string `json:"Email"`
+		ID string `json:"email"`
 	}
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
+		fmt.Println("?????")
 		return err
 	}
 	var email string
@@ -275,21 +276,21 @@ func addProject(c *gin.Context) (int, error) {
 	val += "?)"
 	val = "(" + val
 	var reqBody struct {
-		UID           uint   `json:"uid"`
+		UID           int    `json:"uid"`
 		TITLE         string `json:"title"`
 		DESC          string `json:"desc"`
-		TOTAL         uint   `json:"total"`
-		TERM          uint   `json:"term"`
+		TOTAL         int    `json:"total"`
+		TERM          int    `json:"term"`
 		DUE           string `json:"due"`
 		PATH          string `json:"path"`
-		FE            uint   `json:"fe"`
-		BE            uint   `json:"be"`
-		AOS           uint   `json:"aos"`
-		IOS           uint   `json:"ios"`
-		PM            uint   `json:"pm"`
-		DESIGNER      uint   `json:"designer"`
-		DEVOPS        uint   `json:"devops"`
-		ETC           uint   `json:"etc"`
+		FE            int    `json:"fe"`
+		BE            int    `json:"be"`
+		AOS           int    `json:"aos"`
+		IOS           int    `json:"ios"`
+		PM            int    `json:"pm"`
+		DESIGNER      int    `json:"designer"`
+		DEVOPS        int    `json:"devops"`
+		ETC           int    `json:"etc"`
 		FE_desc       string `json:"fe_desc"`
 		BE_desc       string `json:"be_desc"`
 		AOS_desc      string `json:"aos_desc"`
@@ -299,40 +300,62 @@ func addProject(c *gin.Context) (int, error) {
 		DEVOPS_desc   string `json:"devops_desc"`
 		ETC_desc      string `json:"etc_desc"`
 	}
-	file, handler, err := c.Request.FormFile("hello")
+	c.Request.FormValue("uid")
+	reqBody.UID, _ = strconv.Atoi(c.Request.Form.Get("uid"))
+	reqBody.TOTAL, _ = strconv.Atoi(c.Request.Form.Get("total"))
+	reqBody.TERM, _ = strconv.Atoi(c.Request.Form.Get("term"))
+	reqBody.FE, _ = strconv.Atoi(c.Request.Form.Get("fe"))
+	reqBody.BE, _ = strconv.Atoi(c.Request.Form.Get("be"))
+	reqBody.AOS, _ = strconv.Atoi(c.Request.Form.Get("aos"))
+	reqBody.IOS, _ = strconv.Atoi(c.Request.Form.Get("ios"))
+	reqBody.PM, _ = strconv.Atoi(c.Request.Form.Get("pm"))
+	reqBody.DESIGNER, _ = strconv.Atoi(c.Request.Form.Get("designer"))
+	reqBody.DEVOPS, _ = strconv.Atoi(c.Request.Form.Get("devops"))
+	reqBody.ETC, _ = strconv.Atoi(c.Request.Form.Get("etc"))
+	reqBody.TITLE = c.Request.Form.Get("title")
+	reqBody.DESC = c.Request.Form.Get("desc")
+	reqBody.DUE = c.Request.Form.Get("due")
+	reqBody.PATH = c.Request.Form.Get("path")
+	reqBody.FE_desc = c.Request.Form.Get("fe_desc")
+	reqBody.BE_desc = c.Request.Form.Get("be_desc")
+	reqBody.AOS_desc = c.Request.Form.Get("aos_desc")
+	reqBody.IOS_desc = c.Request.Form.Get("ios_desc")
+	reqBody.PM_desc = c.Request.Form.Get("pm_desc")
+	reqBody.DESIGNER_desc = c.Request.Form.Get("designer_desc")
+	reqBody.DEVOPS_desc = c.Request.Form.Get("devops_desc")
+	reqBody.ETC_desc = c.Request.Form.Get("etc_desc")
+
+	file, _, err := c.Request.FormFile("hello")
+	var pid int
+	db := storage.DB()
+	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
+	path := `http://192.168.0.7/Sites/project_img/` + strconv.Itoa(pid+1) + `.png`
+
 	if err != nil {
 		return -1, err
 	}
-	fmt.Println(c.Request.FormValue("uid"))
-	fmt.Println()
-	fmt.Println(file)
-	fmt.Println()
-	fmt.Println(handler)
-	fmt.Println()
-	dst, err := os.Create(`~/Sites/project_img/` + "5" + `.png`)
+	fmt.Println(reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, reqBody.PATH)
+	_, err = db.Exec(`Insert into project_post(UID,TITLE,TOTAL,DESCRIPTION, TERM, DUE, PATH) values(?,?,?,?,?,?,?)`, reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, path)
+	if err := ErrChecker.Check(err); err != nil {
+		fmt.Println("err 1")
+		return -1, err
+	}
+	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
+
+	fmt.Println("PATH : " + path)
+	path = `/Users/macbook/Sites/project_img/` + strconv.Itoa(pid+1) + `.png`
+	dst, err := os.Create(path)
 	fmt.Println(dst)
 	defer dst.Close()
 
 	if err != nil {
+		fmt.Println("err 2")
 		return -1, err
 	}
 	if _, err := io.Copy(dst, file); err != nil {
+		fmt.Println("err 3")
 		return -1, err
 	}
-	err = c.ShouldBindJSON(&reqBody)
-
-	if err := ErrChecker.Check(err); err != nil {
-		return -1, err
-	}
-
-	db := storage.DB()
-	_, err = db.Exec(`Insert into project_post(UID,TITLE,TOTAL,DESCRIPTION, TERM, DUE, PATH) values(?,?,?,?,?,?,?)`, reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, reqBody.PATH)
-	if err := ErrChecker.Check(err); err != nil {
-		return -1, err
-	}
-	var pid int
-
-	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
 
 	_, err = db.Exec(`Insert into member (pid,fe,be,aos,ios,pm,designer,devops,etc,fe_desc,be_desc,aos_desc,ios_desc,pm_desc,designer_desc,devops_desc,etc_desc) values`+val, pid,
 		reqBody.FE, reqBody.BE, reqBody.AOS, reqBody.IOS, reqBody.PM, reqBody.DESIGNER,
@@ -549,24 +572,4 @@ type project struct {
 	TOTAL       uint   `json:"total"`
 	TERM        uint   `json:"term"`
 	DUE         string `json:"due"`
-}
-
-type member struct {
-	PID           uint
-	FE            uint
-	BE            uint
-	AOS           uint
-	IOS           uint
-	PM            uint
-	DESIGNER      uint
-	DEVOPS        uint
-	ETC           uint
-	FE_desc       string
-	BE_desc       string
-	AOS_desc      string
-	IOS_desc      string
-	PM_desc       string
-	DESIGNER_desc string
-	DEVOPS_desc   string
-	ETC_desc      string
 }
