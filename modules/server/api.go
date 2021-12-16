@@ -184,7 +184,7 @@ func modifyProfile(c *gin.Context) error {
 	fmt.Println("This user id is ", au.UserId)
 	return nil
 }
-func getprojectList(c *gin.Context) ([]project, error) {
+func getProjectList(c *gin.Context) ([]project, error) {
 	db := storage.DB()
 	query := `select count(*) from project_post`
 
@@ -212,7 +212,7 @@ func getprojectList(c *gin.Context) ([]project, error) {
 	}
 	return projects, nil
 }
-func getprojectDetail(c *gin.Context) (project, error) {
+func getProjectDetail(c *gin.Context) (project, error) {
 	projectDetail := project{}
 
 	return projectDetail, nil
@@ -249,7 +249,7 @@ func getCategory(c *gin.Context) ([]project, error) {
 	}
 	return projects, nil
 }
-func addproject(c *gin.Context) error {
+func addProject(c *gin.Context) error {
 	val := strings.Repeat("?,", 16)
 	val += "?)"
 	val = "(" + val
@@ -303,6 +303,24 @@ func addproject(c *gin.Context) error {
 	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
+	return nil
+}
+func joinProject(c *gin.Context) error {
+	var reqBody struct {
+		PID      int    `json:"pid"`
+		UID      int    `json:"uid"`
+		CATEGORY string `json:"category"`
+	}
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
+		return err
+	}
+	db := storage.DB()
+	_, err = db.Exec("insert into join_queue(pid,uid,category) value(?,?,?)", reqBody.PID, reqBody.UID, reqBody.CATEGORY)
+	if err != nil {
+		return err
+	}
+	fmt.Print("조인큐 확인하셈")
 	return nil
 }
 
