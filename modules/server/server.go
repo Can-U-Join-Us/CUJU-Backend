@@ -106,7 +106,7 @@ func registerApiHandlers(api *gin.RouterGroup) {
 	400 -> DB Conn or Query err
 	*/
 	api.GET("/Projects", func(c *gin.Context) {
-		posts, err := getprojectList(c)
+		posts, err := getProjectList(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
@@ -128,11 +128,33 @@ func registerApiHandlers(api *gin.RouterGroup) {
 	400 -> DB Conn or Query err
 	*/
 	api.POST("/Projects/add", func(c *gin.Context) {
-		err := addproject(c)
+		err := addProject(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
 			c.JSON(200, gin.H{"error": nil})
+		}
+	})
+	/*  Reply			200 -> Join post success
+	400 -> DB Conn or Query err
+	*/
+	api.POST("/Projects/join", func(c *gin.Context) {
+		err := joinProject(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil})
+		}
+	})
+	/*  Reply			200 -> Get List<msg> success
+	400 -> DB Conn or Query err
+	*/
+	api.GET("/Refresh", func(c *gin.Context) {
+		msgList, err := refreshMsg(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil, "Message": msgList})
 		}
 	})
 }

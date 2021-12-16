@@ -219,7 +219,7 @@ func getProjectDetail(c *gin.Context) (project, error) {
 }
 func getCategory(c *gin.Context) ([]project, error) {
 	db := storage.DB()
-	category := c.Request.Header.Get("Category")
+	category := c.Request.Header.Get("category")
 	join := category + "_join"
 	_ = join
 	fmt.Println(category, join)
@@ -253,7 +253,6 @@ func addProject(c *gin.Context) error {
 	val := strings.Repeat("?,", 16)
 	val += "?)"
 	val = "(" + val
-	fmt.Println(val)
 	var reqBody struct {
 		UID           uint   `json:"uid"`
 		TITLE         string `json:"title"`
@@ -292,14 +291,11 @@ func addProject(c *gin.Context) error {
 	var pid uint
 
 	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
-	fmt.Println("here?")
-	fmt.Println(`Insert into member value` + val)
+
 	_, err = db.Exec(`Insert into member (pid,fe,be,aos,ios,pm,designer,devops,etc,fe_desc,be_desc,aos_desc,ios_desc,pm_desc,designer_desc,devops_desc,etc_desc) values`+val, pid,
 		reqBody.FE, reqBody.BE, reqBody.AOS, reqBody.IOS, reqBody.PM, reqBody.DESIGNER,
 		reqBody.DEVOPS, reqBody.ETC, `"`+reqBody.FE_desc+`"`, `"`+reqBody.BE_desc+`"`, `"`+reqBody.AOS_desc+`"`,
 		`"`+reqBody.IOS_desc+`"`, `"`+reqBody.PM_desc+`"`, `"`+reqBody.DESIGNER_desc+`"`, `"`+reqBody.DEVOPS_desc+`"`, `"`+reqBody.ETC_desc+`"`)
-	fmt.Println("here!")
-
 	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
@@ -320,17 +316,51 @@ func joinProject(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Print("조인큐 확인하셈")
 	return nil
 }
+func refreshMsg(c *gin.Context) ([]msg, error) {
+	uid := c.Request.Header.Get("uid")
+	db := storage.DB()
+	var pid int
+	var name, email, title string
+	query := `select project_post.pid, name, email, title from user, project_post, join_queue where user.uid = ` + uid + ` and project_post.uid = ` + uid + ` and project_post.pid = join_queue.pid`
+	rows, err := db.Query(query)
 
-type user struct {
-	UID   uint   `json:"uid"`
-	ID    string `json:"id"`
-	PW    string `json:"pw"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	PR    string `json:"pr"`
+	if err != nil {
+		fmt.Println(err)
+		return []msg{}, errors.New("Nothing")
+	}
+	fmt.Println("제목 : ", title)
+	fmt.Println(rows)
+	// if err := ErrChecker.Check(err); err != nil {
+	// 	return []msg{}, err
+	// }
+	defer rows.Close()
+
+	msgList := make([]msg, 0)
+	var m msg
+	for rows.Next() {
+		rows.Scan(&pid, &name, &email, &title)
+		if err := ErrChecker.Check(err); err != nil {
+			return []msg{}, err
+		}
+		m.TYPE = 1
+		m.SUBJECT = strconv.Itoa(pid) + " 번 프로젝트 참여 신청입니다 !"
+		m.CONTENT = name + "(" + email + ") 님이 " + title + "(" + strconv.Itoa(pid) + ") 프로젝트에 참여하고 싶어합니다."
+		m.PID = pid
+		m.UID, _ = strconv.Atoi(uid)
+		fmt.Println(m)
+		msgList = append(msgList, m)
+	}
+	return msgList, nil
+}
+
+type msg struct {
+	TYPE    int    `json:"type"`
+	SUBJECT string `json:"subject"`
+	CONTENT string `json:"content"`
+	PID     int    `json:"pid"`
+	UID     int    `json:"uid"`
 }
 type project struct {
 	PID         uint   `json:"pid"`
