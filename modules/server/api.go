@@ -3,8 +3,10 @@ package server
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/smtp"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -92,7 +94,7 @@ func logoutUser(c *gin.Context) error {
 	}
 	return nil
 }
-func findUser(c *gin.Context) error {
+func findUserPW(c *gin.Context) error {
 	var reqBody struct {
 		ID string `json:"Email"`
 	}
@@ -147,6 +149,25 @@ PW:` + pw
 		panic(err)
 	}
 	return nil
+}
+func findUserId(c *gin.Context) (string, error) {
+	var email string
+	var reqBody struct {
+		PHONE string `json:"phone"`
+	}
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
+		return "", err
+	}
+	fmt.Println(reqBody)
+	db := storage.DB()
+	query := `select email from user where phone = "` + reqBody.PHONE + `"`
+	row := db.QueryRow(query)
+	err = row.Scan(&email)
+	if err := ErrChecker.Check(err); err != nil {
+		return "", err
+	}
+	return email, nil
 }
 func modifyPW(c *gin.Context) error {
 	var reqBody struct {
@@ -222,7 +243,7 @@ func getCategory(c *gin.Context) ([]project, error) {
 	category := c.Request.Header.Get("category")
 	join := category + "_join"
 	_ = join
-	fmt.Println(category, join)
+
 	query := `select count(*) from project_post`
 	var length int
 	_ = db.QueryRow(query).Scan(&length)
@@ -232,7 +253,7 @@ func getCategory(c *gin.Context) ([]project, error) {
 	projects := make([]project, 0)
 	var pos project
 	query = `select project_post.PID,TITLE,DESCRIPTION,TOTAL,TERM,DUE,PATH from project_post join member on project_post.pid = member.pid and  member.` + join + ` < member.` + category
-	fmt.Println(query)
+
 	// category별 참여 인원이 덜 차있는 게시물만 리턴
 	rows, err := db.Query(query)
 	if err := ErrChecker.Check(err); err != nil {
@@ -249,7 +270,7 @@ func getCategory(c *gin.Context) ([]project, error) {
 	}
 	return projects, nil
 }
-func addProject(c *gin.Context) error {
+func addProject(c *gin.Context) (int, error) {
 	val := strings.Repeat("?,", 16)
 	val += "?)"
 	val = "(" + val
@@ -278,17 +299,38 @@ func addProject(c *gin.Context) error {
 		DEVOPS_desc   string `json:"devops_desc"`
 		ETC_desc      string `json:"etc_desc"`
 	}
-	err := c.ShouldBindJSON(&reqBody)
+	file, handler, err := c.Request.FormFile("hello")
+	if err != nil {
+		return -1, err
+	}
+	fmt.Println(c.Request.FormValue("uid"))
+	fmt.Println()
+	fmt.Println(file)
+	fmt.Println()
+	fmt.Println(handler)
+	fmt.Println()
+	dst, err := os.Create(`~/Sites/project_img/` + "5" + `.png`)
+	fmt.Println(dst)
+	defer dst.Close()
+
+	if err != nil {
+		return -1, err
+	}
+	if _, err := io.Copy(dst, file); err != nil {
+		return -1, err
+	}
+	err = c.ShouldBindJSON(&reqBody)
+
 	if err := ErrChecker.Check(err); err != nil {
-		return err
+		return -1, err
 	}
 
 	db := storage.DB()
 	_, err = db.Exec(`Insert into project_post(UID,TITLE,TOTAL,DESCRIPTION, TERM, DUE, PATH) values(?,?,?,?,?,?,?)`, reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, reqBody.PATH)
 	if err := ErrChecker.Check(err); err != nil {
-		return err
+		return -1, err
 	}
-	var pid uint
+	var pid int
 
 	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
 
@@ -297,9 +339,9 @@ func addProject(c *gin.Context) error {
 		reqBody.DEVOPS, reqBody.ETC, `"`+reqBody.FE_desc+`"`, `"`+reqBody.BE_desc+`"`, `"`+reqBody.AOS_desc+`"`,
 		`"`+reqBody.IOS_desc+`"`, `"`+reqBody.PM_desc+`"`, `"`+reqBody.DESIGNER_desc+`"`, `"`+reqBody.DEVOPS_desc+`"`, `"`+reqBody.ETC_desc+`"`)
 	if err := ErrChecker.Check(err); err != nil {
-		return err
+		return -1, err
 	}
-	return nil
+	return pid, nil
 }
 func denyProject(c *gin.Context) error {
 	var reqBody struct {
@@ -361,6 +403,23 @@ func joinProject(c *gin.Context) error {
 		return err
 	}
 	return nil
+}
+func getNumProject(c *gin.Context) (int, error) {
+	var reqBody struct {
+		PID      int    `json:"pid"`
+		UID      int    `json:"uid"`
+		CATEGORY string `json:"category"`
+	}
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
+		return -1, err
+	}
+	db := storage.DB()
+	_, err = db.Exec("insert into join_queue(pid,uid,category) value(?,?,?)", reqBody.PID, reqBody.UID, reqBody.CATEGORY)
+	if err != nil {
+		return -1, err
+	}
+	return -1, nil
 }
 func refreshMsg(c *gin.Context) ([]msg, error) {
 	uid := c.Request.Header.Get("uid")
