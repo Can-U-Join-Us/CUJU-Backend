@@ -33,25 +33,36 @@ func init() { // local : 4000 호스팅 시작
 	r.Run(port)
 }
 func dummy(c *gin.Context) {
-	fmt.Println("미들웨어 더미입니당")
+	fmt.Println("Access Token Check Stage")
 }
 func registerApiHandlers(api *gin.RouterGroup) {
 	/*  Reply			200 -> token
 	400 -> ID or PW incorrect
 	*/
 	api.POST("/User/login", func(c *gin.Context) {
-		token, err := loginUser(c)
+		uid, token, err := loginUser(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(200, gin.H{"error": nil, "token": token})
+			c.JSON(200, gin.H{"error": nil, "token": token, "uid": uid})
 		}
 	})
 	/*  Reply			200 -> null
 	400 -> Modify fail
 	*/
-	api.POST("/User/modify", func(c *gin.Context) {
-		err := modifyUser(c)
+	api.POST("/User/modify/pw", func(c *gin.Context) {
+		err := modifyPW(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil})
+		}
+	})
+	/*  Reply			200 -> null
+	400 -> Modify fail
+	*/
+	api.POST("/User/modify/profile", func(c *gin.Context) {
+		err := modifyProfile(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
@@ -80,22 +91,44 @@ func registerApiHandlers(api *gin.RouterGroup) {
 			c.JSON(200, gin.H{"error": nil})
 		}
 	})
-	/*  Reply			200 -> Get List<post> success
+	/*  Reply			200 -> register success
 	400 -> DB Conn or Query err
 	*/
-	api.GET("/Posts", func(c *gin.Context) {
-		posts, err := getPostList(c)
+	api.POST("/User/find", func(c *gin.Context) {
+		err := findUser(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(200, gin.H{"error": nil, "post": posts})
+			c.JSON(200, gin.H{"error": nil})
+		}
+	})
+	/*  Reply			200 -> Get List<post> success
+	400 -> DB Conn or Query err
+	*/
+	api.GET("/Projects", func(c *gin.Context) {
+		posts, err := getprojectList(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil, "projects": posts})
+		}
+	})
+	/*  Reply			200 -> Get List<post> success
+	400 -> DB Conn or Query err
+	*/
+	api.GET("/Projects/category", func(c *gin.Context) {
+		posts, err := getCategory(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil, "projects": posts})
 		}
 	})
 	/*  Reply			200 -> Add post success
 	400 -> DB Conn or Query err
 	*/
-	api.POST("/Posts/add", func(c *gin.Context) {
-		err := addPost(c)
+	api.POST("/Projects/add", func(c *gin.Context) {
+		err := addproject(c)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
