@@ -323,36 +323,40 @@ func refreshMsg(c *gin.Context) ([]msg, error) {
 	db := storage.DB()
 	var pid int
 	var name, email, title string
-	query := `select project_post.pid, name, email, title from user, project_post, join_queue where user.uid = ` + uid + ` and project_post.uid = ` + uid + ` and project_post.pid = join_queue.pid`
+	query := `select p.pid, j.uid,u.name, u.email, p.title from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid`
 	rows, err := db.Query(query)
-
 	if err != nil {
-		fmt.Println(err)
 		return []msg{}, errors.New("Nothing")
 	}
-	fmt.Println("제목 : ", title)
-	fmt.Println(rows)
-	// if err := ErrChecker.Check(err); err != nil {
-	// 	return []msg{}, err
-	// }
 	defer rows.Close()
-
 	msgList := make([]msg, 0)
-	var m msg
 	for rows.Next() {
-		rows.Scan(&pid, &name, &email, &title)
-		if err := ErrChecker.Check(err); err != nil {
+		var id int
+		if err := rows.Scan(&pid, &id, &name, &email, &title); err != nil {
 			return []msg{}, err
 		}
-		m.TYPE = 1
-		m.SUBJECT = strconv.Itoa(pid) + " 번 프로젝트 참여 신청입니다 !"
-		m.CONTENT = name + "(" + email + ") 님이 " + title + "(" + strconv.Itoa(pid) + ") 프로젝트에 참여하고 싶어합니다."
-		m.PID = pid
-		m.UID, _ = strconv.Atoi(uid)
-		fmt.Println(m)
+		uuid, _ := strconv.Atoi(uid)
+		m := msg{
+			TYPE:    1,
+			SUBJECT: strconv.Itoa(id) + ` 번 프로젝트 참여 신청입니다 !`,
+			CONTENT: name + `(` + email + `) 님이 ` + title + `(` + strconv.Itoa(pid) + `) 프로젝트에 참여하고 싶어합니다.`,
+			PID:     pid,
+			UID:     uuid,
+		}
 		msgList = append(msgList, m)
 	}
+	res, _ := getAnnouncement(c)
+	for i := 0; i < len(res); i++ {
+		msgList = append(msgList, res[i])
+	}
+	if len(msgList) == 0 {
+		return []msg{}, errors.New("Nothing")
+	}
 	return msgList, nil
+}
+func getAnnouncement(c *gin.Context) ([]msg, error) {
+	annoList := make([]msg, 0)
+	return annoList, nil
 }
 
 type msg struct {
