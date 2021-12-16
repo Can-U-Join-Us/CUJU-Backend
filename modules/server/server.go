@@ -157,4 +157,15 @@ func registerApiHandlers(api *gin.RouterGroup) {
 			c.JSON(200, gin.H{"error": nil, "Message": msgList})
 		}
 	})
+	/*  Reply			200 -> POST announceMSG success
+	400 -> DB Conn or Query err
+	*/
+	api.POST("/announce", func(c *gin.Context) {
+		err := postAnnouncement(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil})
+		}
+	})
 }

@@ -301,6 +301,14 @@ func addProject(c *gin.Context) error {
 	}
 	return nil
 }
+func denyProject(c *gin.Context) error {
+
+	return nil
+}
+func permitProject(c *gin.Context) error {
+
+	return nil
+}
 func joinProject(c *gin.Context) error {
 	var reqBody struct {
 		PID      int    `json:"pid"`
@@ -321,42 +329,104 @@ func joinProject(c *gin.Context) error {
 func refreshMsg(c *gin.Context) ([]msg, error) {
 	uid := c.Request.Header.Get("uid")
 	db := storage.DB()
-	var pid int
+	var pid, id, result int
 	var name, email, title string
-	query := `select p.pid, j.uid,u.name, u.email, p.title from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid`
+	query := `select p.pid, j.uid,u.name, u.email, p.title, j.result from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid`
 	rows, err := db.Query(query)
 	if err != nil {
 		return []msg{}, errors.New("Nothing")
 	}
 	defer rows.Close()
 	msgList := make([]msg, 0)
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&pid, &id, &name, &email, &title); err != nil {
-			return []msg{}, err
-		}
-		uuid, _ := strconv.Atoi(uid)
-		m := msg{
-			TYPE:    1,
-			SUBJECT: strconv.Itoa(id) + ` 번 프로젝트 참여 신청입니다 !`,
-			CONTENT: name + `(` + email + `) 님이 ` + title + `(` + strconv.Itoa(pid) + `) 프로젝트에 참여하고 싶어합니다.`,
-			PID:     pid,
-			UID:     uuid,
-		}
-		msgList = append(msgList, m)
-	}
 	res, _ := getAnnouncement(c)
 	for i := 0; i < len(res); i++ {
 		msgList = append(msgList, res[i])
 	}
+	for rows.Next() {
+		if err := rows.Scan(&pid, &id, &name, &email, &title, &result); err != nil {
+			return []msg{}, err
+		}
+		uuid, _ := strconv.Atoi(uid)
+		var m msg
+		if result == 0 {
+			m = msg{
+				TYPE:    1,
+				SUBJECT: strconv.Itoa(id) + ` 번 프로젝트 참여 신청입니다 !`,
+				CONTENT: name + `(` + email + `) 님이 ` + title + `(` + strconv.Itoa(pid) + `) 프로젝트에 참여하고 싶어합니다.`,
+				PID:     pid,
+				UID:     uuid,
+			}
+		} else {
+			var ctt string
+			if result == 1 {
+				ctt = title + `(` + strconv.Itoa(pid) + `) 프로젝트 : 거절`
+			} else {
+				ctt = title + `(` + strconv.Itoa(pid) + `) 프로젝트 : 승인`
+			}
+			m = msg{
+				TYPE:    2,
+				SUBJECT: strconv.Itoa(id) + ` 번 프로젝트 주최자의 답변이 도착했습니다 !`,
+				CONTENT: ctt,
+				PID:     0,
+				UID:     0,
+			}
+		}
+
+		msgList = append(msgList, m)
+	}
+
 	if len(msgList) == 0 {
 		return []msg{}, errors.New("Nothing")
+	}
+	query = `delete j from join_queue j join project_post p on j.pid = p.pid and p.uid = ` + uid + ` left join user u on u.uid = j.uid where j.result > 0`
+	_, err = db.Exec(query) // 참여 결과에 대한 메세지 큐는 삭제
+	if err != nil {
+		return []msg{}, err
 	}
 	return msgList, nil
 }
 func getAnnouncement(c *gin.Context) ([]msg, error) {
 	annoList := make([]msg, 0)
+	db := storage.DB()
+	query := `select subject,content from announce where send = false`
+	rows, err := db.Query(query)
+	if err != nil {
+		return []msg{}, errors.New("Nothing")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var subject, content string
+		if err := rows.Scan(&subject, &content); err != nil {
+			return []msg{}, err
+		}
+		m := msg{
+			TYPE:    0,
+			SUBJECT: subject,
+			CONTENT: content,
+			PID:     0,
+			UID:     0,
+		}
+		annoList = append(annoList, m)
+	}
+
 	return annoList, nil
+}
+func postAnnouncement(c *gin.Context) error {
+	var reqBody struct {
+		SUBJECT string `json:"subject"`
+		CONTENT string `json:"content"`
+	}
+	err := c.ShouldBindJSON(&reqBody)
+	if err := ErrChecker.Check(err); err != nil {
+		return err
+	}
+	db := storage.DB()
+	_, err = db.Exec(`insert into announce values(?,?,?)`, reqBody.SUBJECT, reqBody.CONTENT, 0)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type msg struct {
