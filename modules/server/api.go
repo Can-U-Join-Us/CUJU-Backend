@@ -8,7 +8,6 @@ import (
 	"net/smtp"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	ErrChecker "github.com/Can-U-Join-Us/CUJU-Backend/modules/errors"
@@ -100,17 +99,20 @@ func findUserPW(c *gin.Context) error {
 	}
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
-		fmt.Println("?????")
 		return err
 	}
 	var email string
 	var name string
+	var count int
 	db := storage.DB()
-	query := `select email,name from user where Email = "` + reqBody.ID + `"`
+	query := `select count(*),email,name from user where Email = "` + reqBody.ID + `"`
 	row := db.QueryRow(query)
-	err = row.Scan(&email, &name)
+	err = row.Scan(&count, &email, &name)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
+	}
+	if count == 0 {
+		return errors.New("Invalid id")
 	}
 	pwByte := []byte{}
 	for i := 0; i < 10; i++ {
@@ -124,12 +126,10 @@ func findUserPW(c *gin.Context) error {
 	}
 	pw := string(pwByte)
 	query = `update user set pw ="` + pw + `" where email = "` + reqBody.ID + `"`
-	res, err := db.Exec(query)
+	_, err = db.Exec(query)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
-	nRow, err := res.RowsAffected()
-	fmt.Println("update count : ", nRow)
 	auth := smtp.PlainAuth("", "cujuserver@gmail.com", "cujuroot1!", "smtp.gmail.com")
 	from := "cujuserver@gmail.com"
 	to := []string{reqBody.ID}
@@ -276,12 +276,10 @@ func getCategory(c *gin.Context) ([]project, error) {
 		}
 		projects = append(projects, pos)
 	}
+	fmt.Println(projects)
 	return projects, nil
 }
 func addProject(c *gin.Context) (int, error) {
-	val := strings.Repeat("?,", 16)
-	val += "?)"
-	val = "(" + val
 	var reqBody struct {
 		UID           int    `json:"uid"`
 		TITLE         string `json:"title"`
@@ -336,18 +334,16 @@ func addProject(c *gin.Context) (int, error) {
 	var pid int
 	db := storage.DB()
 	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
-	path := `http://192.168.0.7/Sites/project_img/` + strconv.Itoa(pid+1) + `.png`
+	path := `http://192.168.0.7/project_img/` + strconv.Itoa(pid+1) + `.png`
 
 	if err != nil {
 		return -1, err
 	}
-	fmt.Println(reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, reqBody.PATH)
 	_, err = db.Exec(`Insert into project_post(UID,TITLE,TOTAL,DESCRIPTION, TERM, DUE, PATH) values(?,?,?,?,?,?,?)`, reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, path)
 	if err := ErrChecker.Check(err); err != nil {
 		fmt.Println("err 1")
 		return -1, err
 	}
-	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
 
 	fmt.Println("PATH : " + path)
 	path = `/Users/macbook/Sites/project_img/` + strconv.Itoa(pid+1) + `.png`
@@ -356,18 +352,15 @@ func addProject(c *gin.Context) (int, error) {
 	defer dst.Close()
 
 	if err != nil {
-		fmt.Println("err 2")
 		return -1, err
 	}
 	if _, err := io.Copy(dst, file); err != nil {
-		fmt.Println("err 3")
 		return -1, err
 	}
-
-	_, err = db.Exec(`Insert into member (pid,fe,be,aos,ios,pm,designer,devops,etc,fe_desc,be_desc,aos_desc,ios_desc,pm_desc,designer_desc,devops_desc,etc_desc) values`+val, pid,
+	fmt.Println(pid+1, "\n", reqBody)
+	_, err = db.Exec(`Insert into member (pid,fe,be,aos,ios,pm,designer,devops,etc) values(?,?,?,?,?,?,?,?,?)`, pid+1,
 		reqBody.FE, reqBody.BE, reqBody.AOS, reqBody.IOS, reqBody.PM, reqBody.DESIGNER,
-		reqBody.DEVOPS, reqBody.ETC, `"`+reqBody.FE_desc+`"`, `"`+reqBody.BE_desc+`"`, `"`+reqBody.AOS_desc+`"`,
-		`"`+reqBody.IOS_desc+`"`, `"`+reqBody.PM_desc+`"`, `"`+reqBody.DESIGNER_desc+`"`, `"`+reqBody.DEVOPS_desc+`"`, `"`+reqBody.ETC_desc+`"`)
+		reqBody.DEVOPS, reqBody.ETC)
 	if err := ErrChecker.Check(err); err != nil {
 		return -1, err
 	}
@@ -453,6 +446,7 @@ func getNumProject(c *gin.Context) (int, error) {
 }
 func refreshMsg(c *gin.Context) ([]msg, error) {
 	uid := c.Request.Header.Get("uid")
+	fmt.Println("uid : ", uid)
 	db := storage.DB()
 	var pid, id, result int
 	var name, email, title string
@@ -475,7 +469,7 @@ func refreshMsg(c *gin.Context) ([]msg, error) {
 		uuid, _ := strconv.Atoi(uid)
 		m = msg{
 			TYPE:    1,
-			TITLE:   strconv.Itoa(id) + ` 번 프로젝트 참여 신청입니다 !`,
+			TITLE:   strconv.Itoa(pid) + ` 번 프로젝트 참여 신청입니다 !`,
 			CONTENT: email,
 			PID:     pid,
 			UID:     uuid,
