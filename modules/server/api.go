@@ -235,9 +235,16 @@ func getProjectList(c *gin.Context) ([]project, error) {
 	return projects, nil
 }
 func getProjectDetail(c *gin.Context) (project, error) {
-	projectDetail := project{}
+	var pd project
+	pid := c.Request.Header.Get("pid")
+	pd.PID, _ = strconv.Atoi(pid)
+	db := storage.DB()
 
-	return projectDetail, nil
+	err := db.QueryRow(`select p.title, p.description, p.total, p.path, p.term, p.due, m.fe, m.be, m.aos, m.ios, m.pm, m.designer, m.devops, m.etc from project_post p join member m on p.pid = m.pid where p.pid =`+pid).Scan(&pd.TITLE, &pd.DESCRIPTION, &pd.TOTAL, &pd.PATH, &pd.TERM, &pd.DUE, &pd.FE, &pd.BE, &pd.AOS, &pd.IOS, &pd.PM, &pd.DESIGNER, &pd.DEVOPS, &pd.ETC)
+	if err == nil {
+		return project{}, err
+	}
+	return pd, nil
 }
 func getCategory(c *gin.Context) ([]project, error) {
 	db := storage.DB()
@@ -564,12 +571,20 @@ type msg struct {
 	UID     int    `json:"uid"`
 }
 type project struct {
-	PID         uint   `json:"pid"`
-	UID         uint   `json:"uid"`
+	PID         int    `json:"pid"`
+	UID         int    `json:"uid"`
 	TITLE       string `json:"title"`
 	DESCRIPTION string `json:"desc"`
-	PATH        string `json:"path"`
-	TOTAL       uint   `json:"total"`
-	TERM        uint   `json:"term"`
+	TOTAL       int    `json:"total"`
+	TERM        int    `json:"term"`
 	DUE         string `json:"due"`
+	PATH        string `json:"path"`
+	FE          int    `json:"fe"`
+	BE          int    `json:"be"`
+	AOS         int    `json:"aos"`
+	IOS         int    `json:"ios"`
+	PM          int    `json:"pm"`
+	DESIGNER    int    `json:"designer"`
+	DEVOPS      int    `json:"devops"`
+	ETC         int    `json:"etc"`
 }

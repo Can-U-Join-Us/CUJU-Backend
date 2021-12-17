@@ -124,6 +124,17 @@ func registerApiHandlers(api *gin.RouterGroup) {
 			c.JSON(200, gin.H{"error": nil, "projects": posts})
 		}
 	})
+	/*  Reply			200 -> Get project obj success
+	400 -> DB Conn or Query err
+	*/
+	api.GET("/Project/", func(c *gin.Context) {
+		pd, err := getProjectDetail(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(200, gin.H{"error": nil, "projects": pd})
+		}
+	})
 	/*  Reply			200 -> Get List<post> success
 	400 -> DB Conn or Query err
 	*/
