@@ -15,7 +15,6 @@ func init() {
 		panic(err)
 	}
 	db = DB
-	fmt.Print(DB)
 	var version string
 	db.QueryRow("SELECT VERSION()").Scan(&version)
 	fmt.Println("Connected to:", version)

@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"net/smtp"
 	"strconv"
@@ -40,7 +39,6 @@ func LoginUser(c *gin.Context) (uint64, map[string]string, error) {
 	if err := ErrChecker.Check(err); err != nil {
 		return 0, map[string]string{}, err
 	}
-	fmt.Println(reqBody)
 	db := storage.DB()
 	query := `select uid, PW from user where Email = "` + reqBody.ID + `"`
 	var pw string
@@ -169,14 +167,10 @@ func ModifyPW(c *gin.Context) error {
 	if count == 0 {
 		return errors.New("Invalid pw")
 	}
-	query = `update user set pw ="` + reqBody.NEW + `" where uid = ` + uid
-	fmt.Println(query)
-	res, err := db.Exec(query)
+	_, err = db.Exec(`update user set pw ="` + reqBody.NEW + `" where uid = ` + uid)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
-	nRow, _ := res.RowsAffected()
-	fmt.Println("update count : ", nRow)
 	return nil
 }
 func ModifyProfile(c *gin.Context) error {

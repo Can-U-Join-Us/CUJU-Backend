@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 
 	_ "github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
 	"github.com/Can-U-Join-Us/CUJU-Backend/modules/token"
@@ -17,15 +18,15 @@ func init() { // local : 4000 호스팅 시작
 	}
 	api := r.Group("/api")
 	api.Use(dummy)
-	registerApiHandlers(api)
-
+	RegisterApiHandlers(api)
 	r.Run(port)
 }
+
 func dummy(c *gin.Context) {
 	// access token of request header check stage
-	fmt.Println("Access Token Check Stage")
+	log.Println("Access Token Check Stage")
 }
-func registerApiHandlers(api *gin.RouterGroup) {
+func RegisterApiHandlers(api *gin.RouterGroup) {
 	/*  Reply			200 -> token , uid
 	400 -> ID or PW incorrect
 	*/

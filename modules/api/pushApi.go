@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 
 	ErrChecker "github.com/Can-U-Join-Us/CUJU-Backend/modules/errors"
@@ -12,7 +11,6 @@ import (
 
 func RefreshMsg(c *gin.Context) ([]Msg, error) {
 	uid := c.Request.Header.Get("uid")
-	fmt.Println("uid : ", uid)
 	db := storage.DB()
 	var pid, id, result int
 	var name, email, title string

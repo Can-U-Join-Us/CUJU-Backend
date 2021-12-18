@@ -51,7 +51,8 @@ func RedisInit() error {
 		return err
 	}
 	viper.SetConfigName("config")
-	viper.AddConfigPath(".")   // optionally look for config in the working directory
+	viper.AddConfigPath(".") // optionally look for config in the working directory
+	fmt.Println("Start read config")
 	err = viper.ReadInConfig() // Find and read the config file
 	if err != nil {            // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %w \n", err))
