@@ -11,13 +11,15 @@ import (
 
 const port = ":4000"
 
-func init() { // local : 4000 호스팅 시작
+func Serve(mode int) { // local : 4000 호스팅 시작
 	r := gin.Default()
 	if err := token.RedisInit(); err != nil {
 		panic(fmt.Errorf("Fatal error : redis is off status \n"))
 	}
 	api := r.Group("/api")
-	api.Use(dummy)
+	if mode == 1 {
+		api.Use(dummy)
+	}
 	RegisterApiHandlers(api)
 	r.Run(port)
 }
