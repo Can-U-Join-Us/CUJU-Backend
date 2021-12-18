@@ -11,8 +11,8 @@ import (
 	"time"
 
 	ErrChecker "github.com/Can-U-Join-Us/CUJU-Backend/modules/errors"
-	storage "github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
-	. "github.com/Can-U-Join-Us/CUJU-Backend/modules/token"
+	"github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
+	"github.com/Can-U-Join-Us/CUJU-Backend/modules/token"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -134,11 +134,11 @@ func LoginUser(c *gin.Context) (uint64, map[string]string, error) {
 	if reqBody.PW != pw { // PW 가 다르면 PW 가 다르다는 오류 반환
 		return 0, map[string]string{}, errors.New("PW")
 	}
-	ts, err := CreateToken(uid)
+	ts, err := token.CreateToken(uid)
 	if err := ErrChecker.Check(err); err != nil {
 		return 0, map[string]string{}, err
 	}
-	err = CreateAuth(uid, ts) // Redis 토큰 메타데이터 저장
+	err = token.CreateAuth(uid, ts) // Redis 토큰 메타데이터 저장
 	if err := ErrChecker.Check(err); err != nil {
 		return 0, map[string]string{}, err
 	}
@@ -150,11 +150,11 @@ func LoginUser(c *gin.Context) (uint64, map[string]string, error) {
 }
 func LogoutUser(c *gin.Context) error {
 	// request header 에 담긴 access & refresh token을 검증 후 redis 에서 삭제
-	au, ru, err := ExtractBothTokenMetadata(c.Request)
+	au, ru, err := token.ExtractBothTokenMetadata(c.Request)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
 	}
-	deleted, err := DeleteAuth(au.AccessUuid, ru.RefreshUuid)
+	deleted, err := token.DeleteAuth(au.AccessUuid, ru.RefreshUuid)
 	if err := ErrChecker.Check(err); err != nil || deleted == 0 {
 		return err
 	}
