@@ -12,5 +12,5 @@
 
 ## Run
 ```
-go run main.go
+./run.sh -serve
 ```
