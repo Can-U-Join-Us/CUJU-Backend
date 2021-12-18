@@ -13,15 +13,90 @@ import (
 	ErrChecker "github.com/Can-U-Join-Us/CUJU-Backend/modules/errors"
 	storage "github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
+type resgisterForm struct {
+	Email string `json:"email"`
+	PW    string `json:"pw"`
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+}
+type loginForm struct {
+	ID string `json:"Email"`
+	PW string `json:"pw"`
+}
+type modifyForm struct {
+	UID int    `json:"uid"`
+	PW  string `json:"pw"`
+	NEW string `json:"new"`
+}
+type project struct {
+	PID         int    `json:"pid"`
+	UID         int    `json:"uid"`
+	TITLE       string `json:"title"`
+	DESCRIPTION string `json:"desc"`
+	TOTAL       int    `json:"total"`
+	TERM        int    `json:"term"`
+	DUE         string `json:"due"`
+	PATH        string `json:"path"`
+	FE          int    `json:"fe"`
+	BE          int    `json:"be"`
+	AOS         int    `json:"aos"`
+	IOS         int    `json:"ios"`
+	PM          int    `json:"pm"`
+	DESIGNER    int    `json:"designer"`
+	DEVOPS      int    `json:"devops"`
+	ETC         int    `json:"etc"`
+}
+type addProjectForm struct {
+	UID           int    `json:"uid"`
+	TITLE         string `json:"title"`
+	DESC          string `json:"desc"`
+	TOTAL         int    `json:"total"`
+	TERM          int    `json:"term"`
+	DUE           string `json:"due"`
+	PATH          string `json:"path"`
+	FE            int    `json:"fe"`
+	BE            int    `json:"be"`
+	AOS           int    `json:"aos"`
+	IOS           int    `json:"ios"`
+	PM            int    `json:"pm"`
+	DESIGNER      int    `json:"designer"`
+	DEVOPS        int    `json:"devops"`
+	ETC           int    `json:"etc"`
+	FE_desc       string `json:"fe_desc"`
+	BE_desc       string `json:"be_desc"`
+	AOS_desc      string `json:"aos_desc"`
+	IOS_desc      string `json:"ios_desc"`
+	PM_desc       string `json:"pm_desc"`
+	DESIGNER_desc string `json:"designer_desc"`
+	DEVOPS_desc   string `json:"devops_desc"`
+	ETC_desc      string `json:"etc_desc"`
+}
+type joinForm struct {
+	PID      int    `json:"pid"`
+	UID      int    `json:"uid"`
+	CATEGORY string `json:"category"`
+}
+type replyJoinForm struct {
+	PID int `json:"pid"`
+	UID int `json:"uid"`
+}
+type announce struct {
+	TITLE   string `json:"title"`
+	CONTENT string `json:"content"`
+}
+type msg struct {
+	TYPE    int    `json:"type"`
+	TITLE   string `json:"title"`
+	CONTENT string `json:"content"`
+	PID     int    `json:"pid"`
+	UID     int    `json:"uid"`
+}
+
 func registerUser(c *gin.Context) error {
-	var reqBody struct {
-		Email string `json:"email"`
-		PW    string `json:"pw"`
-		Name  string `json:"name"`
-		Phone string `json:"phone"`
-	}
+	var reqBody resgisterForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
@@ -47,10 +122,7 @@ func registerUser(c *gin.Context) error {
 }
 
 func loginUser(c *gin.Context) (uint64, map[string]string, error) {
-	var reqBody struct {
-		ID string `json:"Email"`
-		PW string `json:"pw"`
-	}
+	var reqBody loginForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return 0, map[string]string{}, err
@@ -152,7 +224,6 @@ PW:` + pw
 	return nil
 }
 func findUserId(c *gin.Context) (string, error) {
-	var email string
 	var reqBody struct {
 		PHONE string `json:"phone"`
 	}
@@ -160,10 +231,10 @@ func findUserId(c *gin.Context) (string, error) {
 	if err := ErrChecker.Check(err); err != nil {
 		return "", err
 	}
-	fmt.Println(reqBody)
 	db := storage.DB()
 	query := `select email from user where phone = "` + reqBody.PHONE + `"`
 	row := db.QueryRow(query)
+	var email string
 	err = row.Scan(&email)
 	if err := ErrChecker.Check(err); err != nil {
 		return "", err
@@ -171,11 +242,7 @@ func findUserId(c *gin.Context) (string, error) {
 	return email, nil
 }
 func modifyPW(c *gin.Context) error {
-	var reqBody struct {
-		UID int    `json:"uid"`
-		PW  string `json:"pw"`
-		NEW string `json:"new"`
-	}
+	var reqBody modifyForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
@@ -280,31 +347,13 @@ func getCategory(c *gin.Context) ([]project, error) {
 	return projects, nil
 }
 func addProject(c *gin.Context) (int, error) {
-	var reqBody struct {
-		UID           int    `json:"uid"`
-		TITLE         string `json:"title"`
-		DESC          string `json:"desc"`
-		TOTAL         int    `json:"total"`
-		TERM          int    `json:"term"`
-		DUE           string `json:"due"`
-		PATH          string `json:"path"`
-		FE            int    `json:"fe"`
-		BE            int    `json:"be"`
-		AOS           int    `json:"aos"`
-		IOS           int    `json:"ios"`
-		PM            int    `json:"pm"`
-		DESIGNER      int    `json:"designer"`
-		DEVOPS        int    `json:"devops"`
-		ETC           int    `json:"etc"`
-		FE_desc       string `json:"fe_desc"`
-		BE_desc       string `json:"be_desc"`
-		AOS_desc      string `json:"aos_desc"`
-		IOS_desc      string `json:"ios_desc"`
-		PM_desc       string `json:"pm_desc"`
-		DESIGNER_desc string `json:"designer_desc"`
-		DEVOPS_desc   string `json:"devops_desc"`
-		ETC_desc      string `json:"etc_desc"`
+	var reqBody addProjectForm
+	err := c.ShouldBindWith(&reqBody, binding.FormMultipart)
+	if err != nil {
+		return -1, err
 	}
+	fmt.Println(reqBody)
+	return -1, errors.New("test")
 	c.Request.FormValue("uid")
 	reqBody.UID, _ = strconv.Atoi(c.Request.Form.Get("uid"))
 	reqBody.TOTAL, _ = strconv.Atoi(c.Request.Form.Get("total"))
@@ -331,6 +380,7 @@ func addProject(c *gin.Context) (int, error) {
 	reqBody.ETC_desc = c.Request.Form.Get("etc_desc")
 
 	file, _, err := c.Request.FormFile("hello")
+
 	var pid int
 	db := storage.DB()
 	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
@@ -367,10 +417,7 @@ func addProject(c *gin.Context) (int, error) {
 	return pid, nil
 }
 func denyProject(c *gin.Context) error {
-	var reqBody struct {
-		PID int `json:"pid"`
-		UID int `json:"uid"`
-	}
+	var reqBody replyJoinForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
@@ -389,10 +436,7 @@ func denyProject(c *gin.Context) error {
 	return nil
 }
 func permitProject(c *gin.Context) error {
-	var reqBody struct {
-		PID int `json:"pid"`
-		UID int `json:"uid"`
-	}
+	var reqBody replyJoinForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
@@ -411,11 +455,7 @@ func permitProject(c *gin.Context) error {
 	return nil
 }
 func joinProject(c *gin.Context) error {
-	var reqBody struct {
-		PID      int    `json:"pid"`
-		UID      int    `json:"uid"`
-		CATEGORY string `json:"category"`
-	}
+	var reqBody joinForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
@@ -428,11 +468,7 @@ func joinProject(c *gin.Context) error {
 	return nil
 }
 func getNumProject(c *gin.Context) (int, error) {
-	var reqBody struct {
-		PID      int    `json:"pid"`
-		UID      int    `json:"uid"`
-		CATEGORY string `json:"category"`
-	}
+	var reqBody joinForm
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return -1, err
@@ -541,10 +577,7 @@ func getAnnouncement(c *gin.Context) ([]msg, error) {
 	return annoList, nil
 }
 func postAnnouncement(c *gin.Context) error {
-	var reqBody struct {
-		TITLE   string `json:"title"`
-		CONTENT string `json:"content"`
-	}
+	var reqBody announce
 	err := c.ShouldBindJSON(&reqBody)
 	if err := ErrChecker.Check(err); err != nil {
 		return err
@@ -555,30 +588,4 @@ func postAnnouncement(c *gin.Context) error {
 		return err
 	}
 	return nil
-}
-
-type msg struct {
-	TYPE    int    `json:"type"`
-	TITLE   string `json:"title"`
-	CONTENT string `json:"content"`
-	PID     int    `json:"pid"`
-	UID     int    `json:"uid"`
-}
-type project struct {
-	PID         int    `json:"pid"`
-	UID         int    `json:"uid"`
-	TITLE       string `json:"title"`
-	DESCRIPTION string `json:"desc"`
-	TOTAL       int    `json:"total"`
-	TERM        int    `json:"term"`
-	DUE         string `json:"due"`
-	PATH        string `json:"path"`
-	FE          int    `json:"fe"`
-	BE          int    `json:"be"`
-	AOS         int    `json:"aos"`
-	IOS         int    `json:"ios"`
-	PM          int    `json:"pm"`
-	DESIGNER    int    `json:"designer"`
-	DEVOPS      int    `json:"devops"`
-	ETC         int    `json:"etc"`
 }
