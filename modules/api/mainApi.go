@@ -2,17 +2,28 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"io"
+	"log"
+	"net"
 	"os"
 	"strconv"
 
 	ErrChecker "github.com/Can-U-Join-Us/CUJU-Backend/modules/errors"
 	"github.com/Can-U-Join-Us/CUJU-Backend/modules/storage"
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 )
 
+func getAddr() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
+}
 func GetProjectList(c *gin.Context) ([]Project, error) {
 	db := storage.DB()
 	var length int
@@ -83,57 +94,35 @@ func GetCategory(c *gin.Context) ([]Project, error) {
 }
 func AddProject(c *gin.Context) (int, error) {
 	var reqBody AddProjectForm
-	err := c.ShouldBindWith(&reqBody, binding.FormMultipart)
-	if err != nil {
-		return -1, err
-	}
-	fmt.Println(reqBody)
-	return -1, errors.New("test")
-	c.Request.FormValue("uid")
-	reqBody.UID, _ = strconv.Atoi(c.Request.Form.Get("uid"))
-	reqBody.TOTAL, _ = strconv.Atoi(c.Request.Form.Get("total"))
-	reqBody.TERM, _ = strconv.Atoi(c.Request.Form.Get("term"))
-	reqBody.FE, _ = strconv.Atoi(c.Request.Form.Get("fe"))
-	reqBody.BE, _ = strconv.Atoi(c.Request.Form.Get("be"))
-	reqBody.AOS, _ = strconv.Atoi(c.Request.Form.Get("aos"))
-	reqBody.IOS, _ = strconv.Atoi(c.Request.Form.Get("ios"))
-	reqBody.PM, _ = strconv.Atoi(c.Request.Form.Get("pm"))
-	reqBody.DESIGNER, _ = strconv.Atoi(c.Request.Form.Get("designer"))
-	reqBody.DEVOPS, _ = strconv.Atoi(c.Request.Form.Get("devops"))
-	reqBody.ETC, _ = strconv.Atoi(c.Request.Form.Get("etc"))
-	reqBody.TITLE = c.Request.Form.Get("title")
-	reqBody.DESC = c.Request.Form.Get("desc")
-	reqBody.DUE = c.Request.Form.Get("due")
-	reqBody.PATH = c.Request.Form.Get("path")
-	reqBody.FE_desc = c.Request.Form.Get("fe_desc")
-	reqBody.BE_desc = c.Request.Form.Get("be_desc")
-	reqBody.AOS_desc = c.Request.Form.Get("aos_desc")
-	reqBody.IOS_desc = c.Request.Form.Get("ios_desc")
-	reqBody.PM_desc = c.Request.Form.Get("pm_desc")
-	reqBody.DESIGNER_desc = c.Request.Form.Get("designer_desc")
-	reqBody.DEVOPS_desc = c.Request.Form.Get("devops_desc")
-	reqBody.ETC_desc = c.Request.Form.Get("etc_desc")
 
-	file, _, err := c.Request.FormFile("hello")
+	err := c.ShouldBind(&reqBody)
+	if err != nil {
+		return 1, err
+	}
+
+	file, _, err := c.Request.FormFile("content")
 
 	var pid int
 	db := storage.DB()
 	db.QueryRow(`select pid from project_post order by pid desc limit 1`).Scan(&pid)
-	path := `http://192.168.0.7/project_img/` + strconv.Itoa(pid+1) + `.png`
+	basePath := "http://" + getAddr()
+	localPath := "/Users/macbook/Sites" // custom
+	dirPath := "/project_img/"          // custom
+	path := basePath + dirPath + strconv.Itoa(pid+1) + `.png`
 
 	if err != nil {
 		return -1, err
 	}
 	_, err = db.Exec(`Insert into project_post(UID,TITLE,TOTAL,DESCRIPTION, TERM, DUE, PATH) values(?,?,?,?,?,?,?)`, reqBody.UID, reqBody.TITLE, reqBody.TOTAL, reqBody.DESC, reqBody.TERM, reqBody.DUE, path)
 	if err := ErrChecker.Check(err); err != nil {
-		fmt.Println("err 1")
 		return -1, err
 	}
 
-	fmt.Println("PATH : " + path)
-	path = `/Users/macbook/Sites/project_img/` + strconv.Itoa(pid+1) + `.png`
+	path = localPath + dirPath + strconv.Itoa(pid+1) + `.png`
 	dst, err := os.Create(path)
-	fmt.Println(dst)
+	if err != nil {
+		return -1, err
+	}
 	defer dst.Close()
 
 	if err != nil {
@@ -142,7 +131,6 @@ func AddProject(c *gin.Context) (int, error) {
 	if _, err := io.Copy(dst, file); err != nil {
 		return -1, err
 	}
-	fmt.Println(pid+1, "\n", reqBody)
 	_, err = db.Exec(`Insert into member (pid,fe,be,aos,ios,pm,designer,devops,etc) values(?,?,?,?,?,?,?,?,?)`, pid+1,
 		reqBody.FE, reqBody.BE, reqBody.AOS, reqBody.IOS, reqBody.PM, reqBody.DESIGNER,
 		reqBody.DEVOPS, reqBody.ETC)
